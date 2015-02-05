@@ -18,6 +18,7 @@
 #include <gst/video/navigation.h>
 #include <gst/audio/audio.h>
 #include <gst/tag/tag.h>
+#include "emotion_hwaccel.h"
 
 typedef void (*Evas_Video_Convert_Cb)(unsigned char *evas_data,
                                       const unsigned char *gst_data,
@@ -96,6 +97,9 @@ struct _EmotionVideoSinkClass {
 struct _EmotionVideoSinkPrivate {
    Evas_Object *emotion_object;
    Evas_Object *evas_object;
+
+   guint hwaccel_mask;
+   Emotion_HWAccel *hwaccel;
 
    GstVideoInfo info;
    unsigned int eheight;

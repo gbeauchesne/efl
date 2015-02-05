@@ -4,9 +4,14 @@
 
 #include "emotion_gstreamer.h"
 
-static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE("sink",
-                                                                   GST_PAD_SINK, GST_PAD_ALWAYS,
-                                                                   GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE("{ I420, YV12, YUY2, NV12, BGRx, BGR, BGRA }"))); 
+#define RAW_VIDEO_CAPS \
+    GST_VIDEO_CAPS_MAKE("{ I420, YV12, YUY2, NV12, BGRx, BGR, BGRA }")
+
+static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE(
+    "sink",
+    GST_PAD_SINK, GST_PAD_ALWAYS,
+    GST_STATIC_CAPS(
+        RAW_VIDEO_CAPS));
 
 GST_DEBUG_CATEGORY_STATIC(emotion_video_sink_debug);
 #define GST_CAT_DEFAULT emotion_video_sink_debug
@@ -18,6 +23,7 @@ enum {
 enum {
   PROP_0,
   PROP_EMOTION_OBJECT,
+  PROP_HWACCEL_MASK,
   PROP_LAST
 };
 
@@ -36,6 +42,48 @@ G_DEFINE_TYPE_WITH_CODE(EmotionVideoSink,
 
 static void unlock_buffer_mutex(EmotionVideoSinkPrivate* priv);
 static void emotion_video_sink_main_render(void *data);
+
+static void
+emotion_video_sink_do_ensure_hwaccel(void *data)
+{
+    EmotionVideoSink * const sink = data;
+    EmotionVideoSinkPrivate * const priv = sink->priv;
+    Emotion_HWAccel *hwaccel = NULL;
+    guint i;
+
+    // Find the best suitable hardware accelerator
+    for (i = 31; i > 0; i--) {
+        if (!(priv->hwaccel_mask & (1U << i)))
+            continue;
+
+        hwaccel = emotion_hwaccel_new(i, priv->emotion_object);
+        if (hwaccel)
+            break;
+    }
+
+    emotion_hwaccel_replace(&priv->hwaccel, hwaccel);
+    emotion_hwaccel_replace(&hwaccel, NULL);
+
+    eina_condition_signal(&priv->c);
+    eina_lock_release(&priv->m);
+    _emotion_pending_ecore_end();
+}
+
+static gboolean
+emotion_video_sink_ensure_hwaccel(EmotionVideoSink *sink)
+{
+    EmotionVideoSinkPrivate * const priv = sink->priv;
+
+    if (!priv->hwaccel) {
+        _emotion_pending_ecore_begin();
+        ecore_main_loop_thread_safe_call_async(
+            emotion_video_sink_do_ensure_hwaccel, sink);
+
+        eina_condition_wait(&priv->c);
+        eina_lock_release(&priv->m);
+    }
+    return priv->hwaccel != NULL;
+}
 
 static void
 emotion_video_sink_init(EmotionVideoSink* sink)
@@ -95,6 +143,11 @@ emotion_video_sink_set_property(GObject * object, guint prop_id,
          }
        eina_lock_release(&priv->m);
        break;
+   case PROP_HWACCEL_MASK:
+       eina_lock_take(&priv->m);
+       priv->hwaccel_mask = g_value_get_uint(value);
+       eina_lock_release(&priv->m);
+       break;
     default:
        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
        ERR("invalid property");
@@ -117,6 +170,11 @@ emotion_video_sink_get_property(GObject * object, guint prop_id,
        INF("sink get property.");
        eina_lock_take(&priv->m);
        g_value_set_pointer(value, priv->emotion_object);
+       eina_lock_release(&priv->m);
+       break;
+   case PROP_HWACCEL_MASK:
+       eina_lock_take(&priv->m);
+       g_value_set_uint(value, priv->hwaccel_mask);
        eina_lock_release(&priv->m);
        break;
     default:
@@ -143,10 +201,57 @@ emotion_video_sink_dispose(GObject* object)
    G_OBJECT_CLASS(parent_class)->dispose(object);
 }
 
-
 /**** BaseSink methods ****/
 
-gboolean emotion_video_sink_set_caps(GstBaseSink *bsink, GstCaps *caps)
+static gboolean
+emotion_video_sink_propose_allocation(GstBaseSink *bsink, GstQuery *query)
+{
+    EmotionVideoSink * const sink = EMOTION_VIDEO_SINK(bsink);
+    EmotionVideoSinkPrivate * const priv = sink->priv;
+
+    if (!emotion_video_sink_ensure_hwaccel(sink))
+        return FALSE;
+    return emotion_hwaccel_propose_allocation(priv->hwaccel, query);
+}
+
+static GstCaps *
+emotion_video_sink_do_get_caps(GstBaseSink *bsink)
+{
+    EmotionVideoSink * const sink = EMOTION_VIDEO_SINK(bsink);
+    EmotionVideoSinkPrivate * const priv = sink->priv;
+    GstCaps *out_caps, *caps;
+
+    out_caps = gst_caps_new_empty();
+
+    caps = gst_caps_from_string(RAW_VIDEO_CAPS);
+    gst_caps_append(out_caps, caps);
+    return out_caps;
+}
+
+static gboolean
+emotion_video_sink_query(GstBaseSink *bsink, GstQuery *query)
+{
+    return GST_BASE_SINK_CLASS(emotion_video_sink_parent_class)->
+        query(bsink, query);
+}
+
+static GstCaps *
+emotion_video_sink_get_caps(GstBaseSink *bsink, GstCaps *filter)
+{
+    GstCaps *caps, *out_caps;
+
+    caps = emotion_video_sink_do_get_caps(bsink);
+    if (caps && filter) {
+        out_caps = gst_caps_intersect_full(caps, filter,
+            GST_CAPS_INTERSECT_FIRST);
+        gst_caps_unref (caps);
+    } else
+        out_caps = caps;
+    return out_caps;
+}
+
+static gboolean
+emotion_video_sink_set_caps(GstBaseSink *bsink, GstCaps *caps)
 {
    EmotionVideoSink* sink;
    EmotionVideoSinkPrivate* priv;
@@ -453,6 +558,11 @@ emotion_video_sink_class_init(EmotionVideoSinkClass* klass)
                                                           "The Emotion object where the display of the video will be done",
                                                           G_PARAM_READWRITE));
 
+   g_object_class_install_property(gobject_class, PROP_HWACCEL_MASK,
+       g_param_spec_uint("hwaccel-mask", "HWAccel Mask",
+           "The set of Hardware Acceleration modes supported",
+           0, G_MAXUINT32, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
    gobject_class->dispose = emotion_video_sink_dispose;
 
    gst_element_class_add_pad_template(gstelement_class, gst_static_pad_template_get(&sinktemplate));
@@ -460,6 +570,9 @@ emotion_video_sink_class_init(EmotionVideoSinkClass* klass)
                                         "Sink/Video", "Sends video data from a GStreamer pipeline to an Emotion object",
                                         "Vincent Torri <vtorri@univ-evry.fr>");
 
+   gstbase_sink_class->propose_allocation = emotion_video_sink_propose_allocation;
+   gstbase_sink_class->query = emotion_video_sink_query;
+   gstbase_sink_class->get_caps = emotion_video_sink_get_caps;
    gstbase_sink_class->set_caps = emotion_video_sink_set_caps;
    gstbase_sink_class->stop = emotion_video_sink_stop;
    gstbase_sink_class->start = emotion_video_sink_start;

@@ -1637,6 +1637,26 @@ _emotion_gstreamer_end(void *data, Ecore_Thread *thread)
    emotion_gstreamer_unref(ev);
 }
 
+static guint
+get_hwaccel_mask(Evas_Object *o)
+{
+    const Emotion_HWAccel_Info **hwaccels;
+    guint hwaccel_mask;
+
+    hwaccels = emotion_hwaccel_info_get_all();
+    if (!hwaccels)
+        return 0;
+
+    hwaccel_mask = 0;
+    hwaccels = emotion_hwaccel_info_get_all();
+    for (hwaccel_mask = 0; *hwaccels != NULL; hwaccels++) {
+        const Emotion_HWAccel_Info * const info = *hwaccels;
+        if (emotion_hwaccel_is_available(info->type, o))
+            hwaccel_mask |= 1U << info->type;
+    }
+    return hwaccel_mask;
+}
+
 static GstElement *
 _create_pipeline(Emotion_Gstreamer *ev,
                  Evas_Object *o,
@@ -1646,6 +1666,7 @@ _create_pipeline(Emotion_Gstreamer *ev,
    GstElement *playbin;
    GstElement *vsink;
    GstBus *bus;
+   guint hwaccel_mask;
    int flags;
 
    if (!uri)
@@ -1665,10 +1686,15 @@ _create_pipeline(Emotion_Gstreamer *ev,
         goto unref_pipeline;
      }
 
+   hwaccel_mask = get_hwaccel_mask(o);
+   g_object_set(G_OBJECT(vsink), "hwaccel-mask", hwaccel_mask, NULL);
    g_object_set(G_OBJECT(vsink), "emotion-object", o, NULL);
 
    g_object_get(G_OBJECT(playbin), "flags", &flags, NULL);
-   g_object_set(G_OBJECT(playbin), "flags", flags | GST_PLAY_FLAG_DOWNLOAD, NULL);
+   if (hwaccel_mask)
+       flags &= ~(GST_PLAY_FLAG_SOFT_COLORBALANCE|GST_PLAY_FLAG_DEINTERLACE);
+   flags |= GST_PLAY_FLAG_DOWNLOAD;
+   g_object_set(G_OBJECT(playbin), "flags", flags, NULL);
    g_object_set(G_OBJECT(playbin), "video-sink", vsink, NULL);
    g_object_set(G_OBJECT(playbin), "uri", uri, NULL);
    if (suburi)
