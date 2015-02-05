@@ -123,6 +123,11 @@ modules/emotion/gstreamer1/emotion_alloc.c \
 modules/emotion/gstreamer1/emotion_convert.c \
 modules/emotion/gstreamer1/emotion_sink.c
 
+if HAVE_GSTREAMER_GL
+EMOTION_GSTREAMER1_SOURCES +=  \
+modules/emotion/gstreamer1/emotion_hwaccel_opengl.c
+endif
+
 if EMOTION_STATIC_BUILD_GSTREAMER1
 lib_emotion_libemotion_la_SOURCES += $(EMOTION_GSTREAMER1_SOURCES)
 else
@@ -133,11 +138,13 @@ modules_emotion_gstreamer1_module_la_SOURCES = $(EMOTION_GSTREAMER1_SOURCES)
 modules_emotion_gstreamer1_module_la_CPPFLAGS = -I$(top_builddir)/src/lib/efl \
 @EMOTION_CFLAGS@ \
 @ECORE_EVAS_CFLAGS@ \
-@EMOTION_MODULE_GSTREAMER1_CFLAGS@
+@EMOTION_MODULE_GSTREAMER1_CFLAGS@ \
+@GSTREAMER_GL_CFLAGS@
 modules_emotion_gstreamer1_module_la_LIBADD = \
 @USE_EMOTION_LIBS@ \
 @USE_ECORE_EVAS_LIBS@ \
-@EMOTION_MODULE_GSTREAMER1_LIBS@
+@EMOTION_MODULE_GSTREAMER1_LIBS@ \
+@GSTREAMER_GL_LIBS@
 modules_emotion_gstreamer1_module_la_DEPENDENCIES = @USE_EMOTION_INTERNAL_LIBS@
 modules_emotion_gstreamer1_module_la_LDFLAGS = -module @EFL_LTMODULE_FLAGS@
 modules_emotion_gstreamer1_module_la_LIBTOOLFLAGS = --tag=disable-static

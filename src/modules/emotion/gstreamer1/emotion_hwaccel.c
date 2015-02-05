@@ -26,6 +26,9 @@
 
 static const Emotion_HWAccel_Info *g_emotion_hwaccel_info[] = {
     &emotion_hwaccel_info_none,
+#if USE_EMOTION_HWACCEL_OPENGL
+    &emotion_hwaccel_info_opengl,
+#endif
     NULL
 };
 
@@ -82,6 +85,7 @@ get_engine_type(Evas_Object *obj, Ecore_Evas_Engine_Type *engine_type_ptr)
     };
 
     static const struct map g_map[] = {
+        { "gl_x11",             ECORE_EVAS_ENGINE_OPENGL_X11    },
         { NULL, }
     };
     const struct map *m;

@@ -48,6 +48,7 @@ typedef gboolean (*Emotion_HWAccel_Upload_Func)(
 
 enum emotion_hwaccel_type {
     EMOTION_HWACCEL_TYPE_NONE = 0,
+    EMOTION_HWACCEL_TYPE_OPENGL,
 };
 
 struct emotion_hwaccel_info_s {
@@ -76,6 +77,7 @@ const Emotion_HWAccel_Info *
 emotion_hwaccel_info_get(Emotion_HWAccel_Type type);
 
 const Emotion_HWAccel_Info emotion_hwaccel_info_none;
+const Emotion_HWAccel_Info emotion_hwaccel_info_opengl;
 
 #define emotion_hwaccel_ref(hwaccel) \
     EMOTION_HWACCEL(gst_mini_object_ref(GST_MINI_OBJECT_CAST(hwaccel)))
@@ -101,5 +103,18 @@ emotion_hwaccel_upload(Emotion_HWAccel *hwaccel,
 /* private */
 void
 emotion_hwaccel_clear(Emotion_HWAccel *hwaccel);
+
+/* ------------------------------------------------------------------------- */
+// OpenGL
+
+#if GST_CHECK_VERSION(1,2,0)
+# define USE_EMOTION_HWACCEL_OPENGL 1
+
+# define EMOTION_HWACCEL_OPENGL_CAPS \
+    GST_VIDEO_CAPS_MAKE_WITH_FEATURES( \
+        GST_CAPS_FEATURE_META_GST_VIDEO_GL_TEXTURE_UPLOAD_META, "BGRA")
+#else
+# define USE_EMOTION_HWACCEL_OPENGL 0
+#endif
 
 #endif /* EMOTION_HWACCEL_H */

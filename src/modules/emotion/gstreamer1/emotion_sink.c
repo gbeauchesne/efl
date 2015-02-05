@@ -11,6 +11,9 @@ static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE(
     "sink",
     GST_PAD_SINK, GST_PAD_ALWAYS,
     GST_STATIC_CAPS(
+#if USE_EMOTION_HWACCEL_OPENGL
+        EMOTION_HWACCEL_OPENGL_CAPS ";"
+#endif
         RAW_VIDEO_CAPS));
 
 GST_DEBUG_CATEGORY_STATIC(emotion_video_sink_debug);
@@ -227,6 +230,13 @@ emotion_video_sink_do_get_caps(GstBaseSink *bsink)
     GstCaps *out_caps, *caps;
 
     out_caps = gst_caps_new_empty();
+
+#if USE_EMOTION_HWACCEL_OPENGL
+    if (priv->hwaccel_mask & (1U << EMOTION_HWACCEL_TYPE_OPENGL)) {
+        caps = gst_caps_from_string(EMOTION_HWACCEL_OPENGL_CAPS);
+        gst_caps_append(out_caps, caps);
+    }
+#endif
 
     caps = gst_caps_from_string(RAW_VIDEO_CAPS);
     gst_caps_append(out_caps, caps);

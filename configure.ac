@@ -2293,13 +2293,18 @@ if test "${want_gstreamer1}" = "yes" -a "${want_gstreamer}" = "yes"; then
    AC_MSG_ERROR([You can only enable either GStreamer 1.0 or GStreamer 0.10 support])
 fi
 
+have_gstreamer_gl="no"
 if test "${want_gstreamer1}" = "yes"; then
   PKG_CHECK_MODULES([GSTREAMER], [gstreamer-1.0])
+
+  PKG_CHECK_MODULES([GSTREAMER_GL], [gstreamer-gl-1.0],
+      [have_gstreamer_gl="yes"], [have_gstreamer_gl="no"])
 fi
 if test "${want_gstreamer}" = "yes"; then
   PKG_CHECK_MODULES([GSTREAMER], [gstreamer-0.10])
 fi
 AM_CONDITIONAL([HAVE_GSTREAMER], [test "${want_gstreamer}" = "yes" -o "${want_gstreamer1}" = "yes"])
+AM_CONDITIONAL([HAVE_GSTREAMER_GL], [test "${have_gstreamer_gl}" = "yes"])
 
 EFL_EVAL_PKGS([ECORE])
 
