@@ -89,6 +89,7 @@ emotion_hwaccel_none_propose_allocation(Emotion_HWAccel *hwaccel EINA_UNUSED,
     GstQuery *query)
 {
     gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
+    gst_query_add_allocation_meta(query, GST_VIDEO_CROP_META_API_TYPE, NULL);
     return TRUE;
 }
 
@@ -96,12 +97,24 @@ gboolean
 emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
     Emotion_Gstreamer_Buffer *emotion_buffer, Evas_Object *image)
 {
+    const GstVideoCropMeta *crop_meta;
     GstVideoFrame gst_frame;
-    guint width, height;
+    Eina_Rectangle r;
     unsigned char *evas_data;
 
-    width = GST_VIDEO_INFO_WIDTH(&emotion_buffer->info);
-    height = GST_VIDEO_INFO_HEIGHT(&emotion_buffer->info);
+    crop_meta = gst_buffer_get_video_crop_meta(emotion_buffer->frame);
+    if (crop_meta) {
+        r.x = crop_meta->x;
+        r.y = crop_meta->y;
+        r.w = crop_meta->width;
+        r.h = crop_meta->height;
+    }
+    else {
+        r.x = 0;
+        r.y = 0;
+        r.w = GST_VIDEO_INFO_WIDTH(&emotion_buffer->info);
+        r.h = GST_VIDEO_INFO_HEIGHT(&emotion_buffer->info);
+    }
 
     // XXX: need to map buffer and KEEP MAPPED until we set new video data or
     // on the evas image object or release the object
@@ -109,18 +122,18 @@ emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
              emotion_buffer->frame, GST_MAP_READ))
         return FALSE;
 
-    INF("sink main render [%i, %i]", width, height);
+    INF("sink main render [%i, %i]", r.w, r.h);
 
     evas_object_image_alpha_set(image, 0);
     evas_object_image_colorspace_set(image, emotion_buffer->eformat);
-    evas_object_image_size_set(image, width, height);
+    evas_object_image_size_set(image, r.w, r.h);
 
     // XXX: need to handle GstVideoCropMeta to get video cropping right
 
     evas_data = evas_object_image_data_get(image, 1);
 
     if (emotion_buffer->func)
-        emotion_buffer->func(evas_data, &gst_frame);
+        emotion_buffer->func(evas_data, &gst_frame, &r);
     else
         WRN("No way to decode %x colorspace !", emotion_buffer->eformat);
 
@@ -128,7 +141,7 @@ emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
     gst_video_frame_unmap(&gst_frame);
 
     evas_object_image_data_set(image, evas_data);
-    evas_object_image_data_update_add(image, 0, 0, width, height);
+    evas_object_image_data_update_add(image, 0, 0, r.w, r.h);
     evas_object_image_pixels_dirty_set(image, 0);
     return TRUE;
 }

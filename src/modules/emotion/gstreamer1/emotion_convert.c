@@ -5,17 +5,19 @@
 #include "emotion_gstreamer.h"
 
 static void
-_evas_video_bgrx(unsigned char *evas_data, GstVideoFrame *gst_frame)
+_evas_video_bgrx(unsigned char *evas_data, GstVideoFrame *gst_frame,
+    const Eina_Rectangle *r)
 {
     GstVideoInfo * const vip = &gst_frame->info;
     const guchar *gst_line = gst_frame->data[0];
     guint x, y, w, h, stride, step;
 
-    w = GST_VIDEO_INFO_WIDTH(vip);
-    h = GST_VIDEO_INFO_HEIGHT(vip);
+    w = r->w;
+    h = r->h;
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, 0);
     step = GST_VIDEO_INFO_COMP_PSTRIDE(vip, 0);
 
+    gst_line += r->y * stride + r->x * step;
     for (y = 0; y < h; y++) {
         const guchar *gst_data = gst_line;
         for (x = 0; x < w; x++) {
@@ -31,17 +33,19 @@ _evas_video_bgrx(unsigned char *evas_data, GstVideoFrame *gst_frame)
 }
 
 static void
-_evas_video_bgra(unsigned char *evas_data, GstVideoFrame *gst_frame)
+_evas_video_bgra(unsigned char *evas_data, GstVideoFrame *gst_frame,
+    const Eina_Rectangle *r)
 {
     GstVideoInfo * const vip = &gst_frame->info;
     const guchar *gst_line = gst_frame->data[0];
     guint x, y, w, h, stride;
     guint8 alpha;
 
-    w = GST_VIDEO_INFO_WIDTH(vip);
-    h = GST_VIDEO_INFO_HEIGHT(vip);
+    w = r->w;
+    h = r->h;
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, 0);
 
+    gst_line += r->y * stride + r->x * 4;
     for (y = 0; y < h; y++) {
         const guchar *gst_data = gst_line;
         for (x = 0; x < w; x++) {
@@ -58,72 +62,85 @@ _evas_video_bgra(unsigned char *evas_data, GstVideoFrame *gst_frame)
 }
 
 static void
-_evas_video_yuv420p(unsigned char *evas_data, GstVideoFrame *gst_frame)
+_evas_video_yuv420p(unsigned char *evas_data, GstVideoFrame *gst_frame,
+    const Eina_Rectangle *r)
 {
     GstVideoInfo * const vip = &gst_frame->info;
     const guchar ** const rows = (const guchar **)evas_data;
     const guchar *gst_data;
-    guint i, j, c, h, stride;
+    guint i, j, c, x, y, h, stride;
 
-    h = GST_VIDEO_INFO_HEIGHT(vip);
+    x = r->x;
+    y = r->y;
+    h = r->h;
     c = 0;
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, c);
-    gst_data = (guchar *)gst_frame->data[c];
+    gst_data = (guchar *)gst_frame->data[c] + y * stride + x;
     for (i = 0; i < h; i++)
         rows[i] = &gst_data[i * stride];
 
+    x = (x + 1) / 2;
+    y = (y + 1) / 2;
     h = (h + 1) / 2;
     c = 1 + !(GST_VIDEO_INFO_FORMAT(vip) == GST_VIDEO_FORMAT_I420);
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, c);
-    gst_data = (guchar *)gst_frame->data[c];
+    gst_data = (guchar *)gst_frame->data[c] + y * stride + x;
     for (j = 0; j < h; j++, i++)
         rows[i] = &gst_data[j * stride];
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, c ^ 3);
-    gst_data = (guchar *)gst_frame->data[c ^ 3];
+    gst_data = (guchar *)gst_frame->data[c ^ 3] + y * stride + x;
     for (j = 0; j < h; j++, i++)
         rows[i] = &gst_data[j * stride];
 }
 
 static void
-_evas_video_yuy2(unsigned char *evas_data, GstVideoFrame *gst_frame)
+_evas_video_yuy2(unsigned char *evas_data, GstVideoFrame *gst_frame,
+    const Eina_Rectangle *r)
 {
     GstVideoInfo * const vip = &gst_frame->info;
     const guchar ** const rows = (const guchar **)evas_data;
     const guchar *gst_data;
-    guint i, h, stride;
+    guint i, x, y, h, stride;
 
-    h = GST_VIDEO_INFO_HEIGHT(vip);
+    x = r->x;
+    y = r->y;
+    h = r->h;
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, 0);
-    gst_data = (guchar *)gst_frame->data[0];
+    gst_data = (guchar *)gst_frame->data[0] + y * stride + ((x >> 1) << 1) * 4;
 
     for (i = 0; i < h; i++)
         rows[i] = &gst_data[i * stride];
 }
 
 static void
-_evas_video_nv12(unsigned char *evas_data, GstVideoFrame *gst_frame)
+_evas_video_nv12(unsigned char *evas_data, GstVideoFrame *gst_frame,
+    const Eina_Rectangle *r)
 {
     GstVideoInfo * const vip = &gst_frame->info;
     const guchar ** const rows = (const guchar **)evas_data;
     const guchar *gst_data;
-    guint i, j, h, stride;
+    guint i, j, x, y, h, stride;
 
-    h = GST_VIDEO_INFO_HEIGHT(vip);
+    x = r->x;
+    y = r->y;
+    h = r->h;
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, 0);
-    gst_data = (guchar *)gst_frame->data[0];
+    gst_data = (guchar *)gst_frame->data[0] + y * stride + x;
 
     for (i = 0; i < h; i++)
         rows[i] = &gst_data[i * stride];
 
+    x = (x + 1) / 2;
+    y = (y + 1) / 2;
     h = (h + 1) / 2;
 
     stride = GST_VIDEO_INFO_COMP_STRIDE(vip, 1);
-    gst_data = (guchar *)gst_frame->data[1];
+    gst_data = (guchar *)gst_frame->data[1] + y * stride + x * 2;
 
     for (j = 0; j < h; j++, i++)
         rows[i] = &gst_data[j * stride];

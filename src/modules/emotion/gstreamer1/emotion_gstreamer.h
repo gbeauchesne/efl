@@ -21,7 +21,8 @@
 #include "emotion_hwaccel.h"
 
 typedef void (*Evas_Video_Convert_Cb)(unsigned char *evas_data,
-                                      GstVideoFrame *gst_frame);
+                                      GstVideoFrame *gst_frame,
+                                      const Eina_Rectangle *r);
 
 typedef struct _EmotionVideoSinkPrivate EmotionVideoSinkPrivate;
 typedef struct _EmotionVideoSink        EmotionVideoSink;
