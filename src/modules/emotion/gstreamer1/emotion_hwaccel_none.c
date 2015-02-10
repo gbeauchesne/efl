@@ -88,6 +88,7 @@ static gboolean
 emotion_hwaccel_none_propose_allocation(Emotion_HWAccel *hwaccel EINA_UNUSED,
     GstQuery *query)
 {
+    gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
     return TRUE;
 }
 
@@ -95,41 +96,39 @@ gboolean
 emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
     Emotion_Gstreamer_Buffer *emotion_buffer, Evas_Object *image)
 {
-    GstBuffer * const buffer = emotion_buffer->frame;
-    GstMapInfo map_info;
+    GstVideoFrame gst_frame;
+    guint width, height;
     unsigned char *evas_data;
+
+    width = GST_VIDEO_INFO_WIDTH(&emotion_buffer->info);
+    height = GST_VIDEO_INFO_HEIGHT(&emotion_buffer->info);
 
     // XXX: need to map buffer and KEEP MAPPED until we set new video data or
     // on the evas image object or release the object
-    if (!gst_buffer_map(buffer, &map_info, GST_MAP_READ))
+    if (!gst_video_frame_map(&gst_frame, &emotion_buffer->info,
+             emotion_buffer->frame, GST_MAP_READ))
         return FALSE;
 
-    INF("sink main render [%i, %i] (source height: %i)",
-        emotion_buffer->info.width, emotion_buffer->eheight,
-        emotion_buffer->info.height);
+    INF("sink main render [%i, %i]", width, height);
 
     evas_object_image_alpha_set(image, 0);
     evas_object_image_colorspace_set(image, emotion_buffer->eformat);
-    evas_object_image_size_set(image, emotion_buffer->info.width,
-        emotion_buffer->eheight);
+    evas_object_image_size_set(image, width, height);
 
     // XXX: need to handle GstVideoCropMeta to get video cropping right
 
     evas_data = evas_object_image_data_get(image, 1);
 
     if (emotion_buffer->func)
-        emotion_buffer->func(evas_data, map_info.data,
-            emotion_buffer->info.width, emotion_buffer->info.height,
-            emotion_buffer->eheight);
+        emotion_buffer->func(evas_data, &gst_frame);
     else
         WRN("No way to decode %x colorspace !", emotion_buffer->eformat);
 
     // XXX: this unmap here is broken
-    gst_buffer_unmap(buffer, &map_info);
+    gst_video_frame_unmap(&gst_frame);
 
     evas_object_image_data_set(image, evas_data);
-    evas_object_image_data_update_add(image, 0, 0, emotion_buffer->info.width,
-        emotion_buffer->eheight);
+    evas_object_image_data_update_add(image, 0, 0, width, height);
     evas_object_image_pixels_dirty_set(image, 0);
     return TRUE;
 }
