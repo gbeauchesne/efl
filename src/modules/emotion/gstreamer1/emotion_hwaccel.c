@@ -168,6 +168,10 @@ emotion_hwaccel_propose_allocation(Emotion_HWAccel *hwaccel, GstQuery *query)
 }
 
 gboolean
+emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel,
+    Emotion_HWAccel_Buffer *emotion_buffer, Evas_Object *image);
+
+gboolean
 emotion_hwaccel_upload(Emotion_HWAccel *hwaccel,
     Emotion_HWAccel_Buffer *emotion_buffer, Evas_Object *image)
 {
@@ -181,6 +185,8 @@ emotion_hwaccel_upload(Emotion_HWAccel *hwaccel,
 
     info = hwaccel->info;
     success = info->upload && info->upload(hwaccel, emotion_buffer, image);
+    if (!success && info->type != EMOTION_HWACCEL_TYPE_NONE)
+        success = emotion_hwaccel_none_upload(hwaccel, emotion_buffer, image);
     if (!success)
         return FALSE;
 
