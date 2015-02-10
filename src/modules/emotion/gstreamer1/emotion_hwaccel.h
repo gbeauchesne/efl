@@ -75,6 +75,8 @@ emotion_hwaccel_info_get_all(void);
 const Emotion_HWAccel_Info *
 emotion_hwaccel_info_get(Emotion_HWAccel_Type type);
 
+const Emotion_HWAccel_Info emotion_hwaccel_info_none;
+
 #define emotion_hwaccel_ref(hwaccel) \
     EMOTION_HWACCEL(gst_mini_object_ref(GST_MINI_OBJECT_CAST(hwaccel)))
 #define emotion_hwaccel_unref(hwaccel) \

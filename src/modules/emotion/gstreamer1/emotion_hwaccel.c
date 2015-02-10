@@ -25,6 +25,7 @@
 #include "emotion_gstreamer.h"
 
 static const Emotion_HWAccel_Info *g_emotion_hwaccel_info[] = {
+    &emotion_hwaccel_info_none,
     NULL
 };
 
@@ -124,7 +125,12 @@ emotion_hwaccel_new(Emotion_HWAccel_Type type, Evas_Object *obj)
 
     g_return_val_if_fail(obj != NULL, NULL);
 
-    if (!info || !info->allocate || !get_engine_type(obj, &etype))
+    if (!info || !info->allocate)
+        return NULL;
+
+    if (type == EMOTION_HWACCEL_TYPE_NONE)
+        etype = (Ecore_Evas_Engine_Type)-1; /* allow anything */
+    else if (!get_engine_type(obj, &etype))
         return NULL;
     return info->allocate(obj, etype);
 }

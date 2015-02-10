@@ -116,6 +116,7 @@ endif
 EMOTION_GSTREAMER1_SOURCES = \
 modules/emotion/gstreamer1/emotion_hwaccel.h \
 modules/emotion/gstreamer1/emotion_hwaccel.c \
+modules/emotion/gstreamer1/emotion_hwaccel_none.c \
 modules/emotion/gstreamer1/emotion_gstreamer.h \
 modules/emotion/gstreamer1/emotion_gstreamer.c \
 modules/emotion/gstreamer1/emotion_alloc.c \

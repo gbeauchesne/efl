@@ -61,6 +61,11 @@ emotion_video_sink_do_ensure_hwaccel(void *data)
             break;
     }
 
+    // ... or default to "software" uploads, i.e. copy
+    if (!hwaccel)
+        hwaccel = emotion_hwaccel_new(EMOTION_HWACCEL_TYPE_NONE,
+            priv->emotion_object);
+
     emotion_hwaccel_replace(&priv->hwaccel, hwaccel);
     emotion_hwaccel_replace(&hwaccel, NULL);
 
@@ -439,8 +444,6 @@ emotion_video_sink_main_render(void *data)
    Emotion_Gstreamer_Buffer *send;
    EmotionVideoSinkPrivate *priv;
    GstBuffer *buffer = NULL;
-   GstMapInfo map;
-   unsigned char *evas_data;
    double ratio;
 
    send = data;
@@ -476,32 +479,8 @@ emotion_video_sink_main_render(void *data)
 
    buffer = gst_buffer_ref(send->frame);
 
-   // XXX: need to map buffer and KEEP MAPPED until we set new video data or
-   // on the evas image object or release the object
-   if (!gst_buffer_map(buffer, &map, GST_MAP_READ))
-     goto exit_point;
-
-   INF("sink main render [%i, %i] (source height: %i)", send->info.width, send->eheight, send->info.height);
-
-   evas_object_image_alpha_set(priv->evas_object, 0);
-   evas_object_image_colorspace_set(priv->evas_object, send->eformat);
-   evas_object_image_size_set(priv->evas_object, send->info.width, send->eheight);
-
-   // XXX: need to handle GstVideoCropMeta to get video cropping right
-
-   evas_data = evas_object_image_data_get(priv->evas_object, 1);
-
-   if (send->func)
-     send->func(evas_data, map.data, send->info.width, send->info.height, send->eheight);
-   else
-     WRN("No way to decode %x colorspace !", send->eformat);
-
-   // XXX: this unmap here is broken
-   gst_buffer_unmap(buffer, &map);
-
-   evas_object_image_data_set(priv->evas_object, evas_data);
-   evas_object_image_data_update_add(priv->evas_object, 0, 0, send->info.width, send->eheight);
-   evas_object_image_pixels_dirty_set(priv->evas_object, 0);
+   if (!emotion_hwaccel_upload(priv->hwaccel, send, priv->evas_object))
+       goto exit_point;
 
    _update_emotion_fps(priv);
 
