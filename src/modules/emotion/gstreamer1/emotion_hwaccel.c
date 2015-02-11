@@ -86,6 +86,7 @@ get_engine_type(Evas_Object *obj, Ecore_Evas_Engine_Type *engine_type_ptr)
 
     static const struct map g_map[] = {
         { "gl_x11",             ECORE_EVAS_ENGINE_OPENGL_X11    },
+        { "wayland_egl",        ECORE_EVAS_ENGINE_WAYLAND_EGL   },
         { NULL, }
     };
     const struct map *m;

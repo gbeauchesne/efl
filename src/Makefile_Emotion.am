@@ -126,6 +126,12 @@ modules/emotion/gstreamer1/emotion_sink.c
 if HAVE_GSTREAMER_GL
 EMOTION_GSTREAMER1_SOURCES +=  \
 modules/emotion/gstreamer1/emotion_hwaccel_opengl.c
+
+if BUILD_ECORE_EVAS_WAYLAND
+EMOTION_GSTREAMER1_SOURCES +=  \
+modules/emotion/gstreamer1/gstgldisplay_wayland.h \
+modules/emotion/gstreamer1/gstgldisplay_wayland.c
+endif
 endif
 
 if EMOTION_STATIC_BUILD_GSTREAMER1

@@ -31,6 +31,7 @@
 #define USE_X11         (defined(BUILD_ENGINE_GL_X11) && GST_GL_HAVE_WINDOW_X11)
 #define USE_GLX         (!defined(GL_GLES) || GL_GLES == 0)
 #define USE_EGL         (defined(GL_GLES) && GL_GLES > 0)
+#define USE_WAYLAND     (defined(BUILD_ENGINE_WAYLAND_EGL) && GST_GL_HAVE_WINDOW_WAYLAND)
 
 #if USE_EGL
 # include <gst/gl/egl/gstgldisplay_egl.h>
@@ -39,6 +40,12 @@
 #if USE_X11
 # include <gst/gl/x11/gstgldisplay_x11.h>
 # include "modules/evas/engines/gl_x11/Evas_Engine_GL_X11.h"
+#endif
+
+#if USE_WAYLAND
+/*include <gst/gl/wayland/gstgldisplay_wayland.h> */
+# include "gstgldisplay_wayland.h"
+# include "modules/evas/engines/wayland_egl/Evas_Engine_Wayland_Egl.h"
 #endif
 
 #if 0
@@ -85,6 +92,9 @@ ensure_display_type(Emotion_HWAccel_OpenGL *hwaccel, gint engine_type)
     case ECORE_EVAS_ENGINE_OPENGL_X11:
         hwaccel->gl_display_type = GST_GL_DISPLAY_TYPE_X11;
         break;
+    case ECORE_EVAS_ENGINE_WAYLAND_EGL:
+        hwaccel->gl_display_type = GST_GL_DISPLAY_TYPE_WAYLAND;
+        break;
     default:
         hwaccel->gl_display_type = GST_GL_DISPLAY_TYPE_NONE;
         break;
@@ -111,6 +121,16 @@ ensure_display(Emotion_HWAccel_OpenGL *hwaccel, gint engine_type)
 
         hwaccel->gl_display = GST_GL_DISPLAY(
             gst_gl_display_x11_new_with_display(einfo->info.display));
+        break;
+    }
+#endif
+#if USE_WAYLAND
+    case ECORE_EVAS_ENGINE_WAYLAND_EGL: {
+        Evas_Engine_Info_Wayland_Egl * const einfo =
+            (Evas_Engine_Info_Wayland_Egl *)evas_engine_info_get(evas);
+
+        hwaccel->gl_display = GST_GL_DISPLAY(
+            gst_gl_display_wayland_new_with_display(einfo->info.display));
         break;
     }
 #endif
@@ -216,6 +236,13 @@ ensure_current_context(Emotion_HWAccel_OpenGL *hwaccel)
                 gst_gl_display_x11_new_with_display(
                     GSIZE_TO_POINTER(gl_display_handle)));
         break;
+#endif
+#if USE_WAYLAND
+        case GST_GL_DISPLAY_TYPE_WAYLAND:
+            gl_display = GST_GL_DISPLAY(
+                gst_gl_display_wayland_new_with_display(
+                    GSIZE_TO_POINTER(gl_display_handle)));
+            break;
 #endif
         default:
             gl_display = NULL;
@@ -336,6 +363,10 @@ emotion_hwaccel_opengl_is_available(Evas_Object *obj EINA_UNUSED,
     switch (engine_type) {
 #if USE_X11 && defined(BUILD_ECORE_EVAS_OPENGL_X11)
     case ECORE_EVAS_ENGINE_OPENGL_X11:
+        return TRUE;
+#endif
+#if USE_WAYLAND && defined(BUILD_ECORE_EVAS_WAYLAND_EGL)
+    case ECORE_EVAS_ENGINE_WAYLAND_EGL:
         return TRUE;
 #endif
     }
