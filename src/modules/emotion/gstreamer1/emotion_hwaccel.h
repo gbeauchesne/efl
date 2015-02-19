@@ -68,6 +68,7 @@ struct emotion_hwaccel_s {
     Evas_Object *emotion_object;
     Evas_Object *evas_image;
     GstBuffer *buffer;
+    GstVideoFrame frame;
 };
 
 const Emotion_HWAccel_Info **

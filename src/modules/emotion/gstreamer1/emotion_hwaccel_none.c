@@ -94,11 +94,10 @@ emotion_hwaccel_none_propose_allocation(Emotion_HWAccel *hwaccel EINA_UNUSED,
 }
 
 gboolean
-emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
+emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel,
     Emotion_Gstreamer_Buffer *emotion_buffer, Evas_Object *image)
 {
     const GstVideoCropMeta *crop_meta;
-    GstVideoFrame gst_frame;
     Eina_Rectangle r;
     unsigned char *evas_data;
 
@@ -116,9 +115,12 @@ emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
         r.h = GST_VIDEO_INFO_HEIGHT(&emotion_buffer->info);
     }
 
-    // XXX: need to map buffer and KEEP MAPPED until we set new video data or
-    // on the evas image object or release the object
-    if (!gst_video_frame_map(&gst_frame, &emotion_buffer->info,
+    if (hwaccel->frame.buffer) {
+        gst_video_frame_unmap(&hwaccel->frame);
+        hwaccel->frame.buffer = NULL;
+    }
+
+    if (!gst_video_frame_map(&hwaccel->frame, &emotion_buffer->info,
              emotion_buffer->frame, GST_MAP_READ))
         return FALSE;
 
@@ -133,12 +135,9 @@ emotion_hwaccel_none_upload(Emotion_HWAccel *hwaccel EINA_UNUSED,
     evas_data = evas_object_image_data_get(image, 1);
 
     if (emotion_buffer->func)
-        emotion_buffer->func(evas_data, &gst_frame, &r);
+        emotion_buffer->func(evas_data, &hwaccel->frame, &r);
     else
         WRN("No way to decode %x colorspace !", emotion_buffer->eformat);
-
-    // XXX: this unmap here is broken
-    gst_video_frame_unmap(&gst_frame);
 
     evas_object_image_data_set(image, evas_data);
     evas_object_image_data_update_add(image, 0, 0, r.w, r.h);

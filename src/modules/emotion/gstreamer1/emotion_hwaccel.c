@@ -148,6 +148,10 @@ emotion_hwaccel_clear_internal(Emotion_HWAccel *hwaccel)
         hwaccel->evas_image = NULL;
     }
 
+    if (hwaccel->frame.buffer) {
+        gst_video_frame_unmap(&hwaccel->frame);
+        hwaccel->frame.buffer = NULL;
+    }
     gst_buffer_replace(&hwaccel->buffer, NULL);
 }
 
